@@ -4,6 +4,7 @@ int clicks;
 String data;
 
 void setup() { 
+  size(512, 512, P2D);
   // Connect to the local machine at port 10002.
   // This example will not run if you haven't
   // previously started a server on this port.
@@ -16,7 +17,7 @@ void mouseReleased() {
   // Count the number of mouse clicks:
   clicks++;
   // Tell the server:
-  String msg = "get time";
+  String msg = "get frame";
   myClient.write(msg);
 }
 
@@ -29,9 +30,24 @@ void draw() {
   }
   
   if (myClient.available() > 0) {    // If there's incoming data from the client...
-    data = myClient.readString();   // ...then grab it and print it 
-    println(data); 
-  } 
+    data += myClient.readString();   // ...then grab it and print it 
+    
+  } else{
+    PImage img = createImage(512, 512, RGB);
+    int counter = 0;
+    if(data != null){
+      println(data);
+      String[] colors  = split(data, "|");
+      for(String c : colors){
+        println("FF" + c);
+        img.pixels[counter++] = unhex("FF" + c);
+      }
+      image(img, 0,0);
+      data = null;
+    }
+    
+    //println(data); 
+  }
 
 } 
 

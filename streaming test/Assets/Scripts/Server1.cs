@@ -9,18 +9,52 @@ using UnityEngine;
 public class Server1 : MonoBehaviour {
     //https://www.youtube.com/watch?v=xgLRe7QV6QI
 
+
+    Camera cam;
+    Texture2D tex;
+    public int imgWidth = 512;
+    public int imgHeight = 512;
+    RenderTexture rt;
+    byte[] currentFrame;
+    string ip; 
+
     private List<Socket> _clientSockets = new List<Socket>();
     private byte[] _buffer = new byte[1024];
-    private Socket _serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    private Socket _serverSocket = new Socket(
+        AddressFamily.InterNetwork,
+        SocketType.Stream,
+        ProtocolType.Tcp
+        );
+
+    
 
     // Use this for initialization
     void Start() {
         SetupServer();
+
+        cam = GetComponent<Camera>();
+        tex = new Texture2D(imgWidth, imgHeight);
+        rt = new RenderTexture(imgWidth, imgWidth, 16);
     }
 
+    private void Update()
+    {
+        // Render to RenderTexture
+        cam.targetTexture = rt;
+        cam.Render();
+        // Read pixels to texture
+        RenderTexture.active = rt;
+        tex.ReadPixels(new Rect(0, 0, imgWidth, imgHeight), 0, 0);
+        // Read texture to array
+        currentFrame = tex.EncodeToJPG(); 
+    }
+
+   
+
     private void SetupServer() {
-        Debug.Log("Setting up server");
-        _serverSocket.Bind(new IPEndPoint(IPAddress.Any, 73));
+        ip = IPAddress.Any.ToString();
+        Debug.Log("Setting up server on " + ip);
+        _serverSocket.Bind(new IPEndPoint(IPAddress.Parse(ip), 73));
         _serverSocket.Listen(1);
         _serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
     }
@@ -51,17 +85,9 @@ public class Server1 : MonoBehaviour {
         string text = Encoding.ASCII.GetString(dataBuffer);
         Debug.Log("Text recieved: " + text);
 
-        string response = string.Empty;
-        if (text.ToLower() != "get time")
-        {
-            response = "Invalid Request";
-        }
-        else {
-            response = DateTime.Now.ToLongTimeString();
-        }
-
-        byte[] data = Encoding.ASCII.GetBytes(response);
-        socket.BeginSend(data, 0, data.Length, SocketFlags.None, new AsyncCallback(SendCallback), null);
+        // byte[] data = tex.EncodeToJPG();
+        byte[] data = currentFrame;
+         socket.BeginSend(data, 0, data.Length, SocketFlags.None, new AsyncCallback(SendCallback), null);
 
         socket.BeginReceive(
             _buffer,
@@ -78,5 +104,14 @@ public class Server1 : MonoBehaviour {
     private void SendCallback(IAsyncResult AR) {
         Socket socket = (Socket)AR.AsyncState;
         socket.EndSend(AR);
+    }
+
+    private void OnApplicationQuit()
+    {
+        foreach (var s in _clientSockets)
+        {
+            s.Close();
+        }
+        _serverSocket.Close();
     }
 }
